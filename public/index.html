@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTC Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/chart.css">
+  <link rel="stylesheet" href="css/tweets.css">
+  <link rel="stylesheet" href="css/news.css">
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Header -->
+    <header class="dashboard-header">
+      <h1><span class="btc-icon">&#8383;</span> BTC Dashboard</h1>
+      <span class="last-updated" id="lastUpdated">--</span>
+    </header>
+
+    <!-- Left Column: Chart + Tweets -->
+    <main class="left-column">
+      <!-- Chart Section -->
+      <section class="chart-section panel">
+        <div class="ticker-bar">
+          <span class="ticker-price" id="tickerPrice">--</span>
+          <span class="ticker-change" id="tickerChange">--</span>
+          <div class="ticker-meta">
+            <div class="ticker-meta-item">
+              <span class="ticker-meta-label">Market Cap</span>
+              <span class="ticker-meta-value" id="tickerMcap">--</span>
+            </div>
+            <div class="ticker-meta-item">
+              <span class="ticker-meta-label">24h Volume</span>
+              <span class="ticker-meta-value" id="tickerVolume">--</span>
+            </div>
+            <div class="ticker-meta-item">
+              <span class="ticker-meta-label">BTC Dominance</span>
+              <span class="ticker-meta-value" id="tickerDominance">--</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-controls">
+          <div class="range-buttons" id="rangeButtons">
+            <button class="range-btn" data-days="1">1D</button>
+            <button class="range-btn" data-days="7">1W</button>
+            <button class="range-btn active" data-days="30">1M</button>
+            <button class="range-btn" data-days="90">3M</button>
+            <button class="range-btn" data-days="180">6M</button>
+            <button class="range-btn" data-days="365">1Y</button>
+          </div>
+
+          <div class="comparison-buttons" id="comparisonButtons">
+            <button class="comparison-btn" data-mode="yoy">YoY</button>
+            <button class="comparison-btn" data-mode="mom">MoM</button>
+            <button class="comparison-btn" data-mode="pop">PoP</button>
+          </div>
+
+          <button class="normalize-toggle" id="normalizeToggle" title="Show percentage change">%</button>
+
+          <div class="custom-range">
+            <input type="date" id="rangeFrom" title="Start date">
+            <span style="color: var(--text-muted);">to</span>
+            <input type="date" id="rangeTo" title="End date">
+            <button class="range-apply" id="rangeApply">Apply</button>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-legend" id="chartLegend"></div>
+          <div id="chartTarget"></div>
+        </div>
+      </section>
+
+      <!-- Tweets Section -->
+      <section class="tweets-section panel">
+        <div class="panel-header">
+          <h2>Live Feeds</h2>
+        </div>
+        <div class="tweets-grid" id="tweetsGrid">
+          <div class="tweet-card loading" data-handle="zerohedge">
+            <div class="tweet-card-header">
+              <div class="tweet-avatar">ZH</div>
+              <span class="tweet-handle">@zerohedge</span>
+              <span class="tweet-time">--</span>
+            </div>
+            <p class="tweet-text">Loading latest tweets...</p>
+          </div>
+          <div class="tweet-card loading" data-handle="prestonpysh">
+            <div class="tweet-card-header">
+              <div class="tweet-avatar">PP</div>
+              <span class="tweet-handle">@prestonpysh</span>
+              <span class="tweet-time">--</span>
+            </div>
+            <p class="tweet-text">Loading latest tweets...</p>
+          </div>
+          <div class="tweet-card loading" data-handle="LukeGromen">
+            <div class="tweet-card-header">
+              <div class="tweet-avatar">LG</div>
+              <span class="tweet-handle">@LukeGromen</span>
+              <span class="tweet-time">--</span>
+            </div>
+            <p class="tweet-text">Loading latest tweets...</p>
+          </div>
+          <div class="tweet-card loading" data-handle="jackmallers">
+            <div class="tweet-card-header">
+              <div class="tweet-avatar">JM</div>
+              <span class="tweet-handle">@jackmallers</span>
+              <span class="tweet-time">--</span>
+            </div>
+            <p class="tweet-text">Loading latest tweets...</p>
+          </div>
+          <div class="tweet-card loading" data-handle="LynAldenContact">
+            <div class="tweet-card-header">
+              <div class="tweet-avatar">LA</div>
+              <span class="tweet-handle">@LynAldenContact</span>
+              <span class="tweet-time">--</span>
+            </div>
+            <p class="tweet-text">Loading latest tweets...</p>
+          </div>
+          <div class="tweet-card loading" data-handle="willywoo">
+            <div class="tweet-card-header">
+              <div class="tweet-avatar">WW</div>
+              <span class="tweet-handle">@willywoo</span>
+              <span class="tweet-time">--</span>
+            </div>
+            <p class="tweet-text">Loading latest tweets...</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Right Column: News Feed -->
+    <aside class="right-column panel news-section">
+      <div class="panel-header">
+        <h2>News</h2>
+        <div class="news-tabs" id="newsTabs">
+          <button class="news-tab active" data-category="all">All</button>
+          <button class="news-tab" data-category="bitcoin">Bitcoin</button>
+          <button class="news-tab" data-category="macro">Macro</button>
+        </div>
+      </div>
+      <div class="news-feed-wrapper">
+        <div class="news-feed" id="newsFeed">
+          <!-- News items populated by JS -->
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="https://unpkg.com/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

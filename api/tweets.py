@@ -1,0 +1,114 @@
+from http.server import BaseHTTPRequestHandler
+import json
+import urllib.request
+import urllib.parse
+import os
+import time
+
+_cache = {}
+CACHE_TTL = 900  # 15 minutes
+
+ALLOWED_HANDLES = {
+    "zerohedge", "prestonpysh", "LukeGromen",
+    "jackmallers", "LynAldenContact", "willywoo",
+}
+
+
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        try:
+            params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            handle = params.get("handle", [None])[0]
+
+            if not handle or handle not in ALLOWED_HANDLES:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "invalid handle"}).encode())
+                return
+
+            cache_key = f"tweets:{handle}"
+            now = time.time()
+
+            if cache_key in _cache and (now - _cache[cache_key]["ts"]) < CACHE_TTL:
+                data = _cache[cache_key]["data"]
+            else:
+                token = os.environ.get("APIFY_TOKEN", "")
+                if not token:
+                    # Return mock data when no token is configured
+                    data = self._mock_tweets(handle)
+                else:
+                    data = self._fetch_from_apify(handle, token)
+
+                _cache[cache_key] = {"data": data, "ts": now}
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
+
+        except Exception as e:
+            self.send_response(500)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": str(e)}).encode())
+
+    def _fetch_from_apify(self, handle, token):
+        # Run the Apify actor synchronously and get results
+        actor_id = "apidojo~tweet-scraper"
+        run_url = (
+            f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
+            f"?token={token}"
+        )
+        payload = json.dumps({
+            "twitterHandles": [handle],
+            "tweetsDesired": 5,
+            "proxyConfig": {"useApifyProxy": True},
+        }).encode()
+
+        req = urllib.request.Request(
+            run_url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            items = json.loads(resp.read())
+
+        # Normalize to our format
+        tweets = []
+        for item in items[:5]:
+            tweets.append({
+                "id": item.get("id", ""),
+                "text": item.get("full_text", item.get("text", "")),
+                "created_at": item.get("created_at", ""),
+                "retweet_count": item.get("retweet_count", 0),
+                "favorite_count": item.get("favorite_count", item.get("like_count", 0)),
+                "reply_count": item.get("reply_count", 0),
+                "handle": handle,
+            })
+
+        return {"tweets": tweets, "handle": handle}
+
+    def _mock_tweets(self, handle):
+        """Return placeholder data when APIFY_TOKEN is not set."""
+        return {
+            "tweets": [
+                {
+                    "id": "mock_1",
+                    "text": f"Configure APIFY_TOKEN env var to see live tweets from @{handle}",
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "retweet_count": 0,
+                    "favorite_count": 0,
+                    "reply_count": 0,
+                    "handle": handle,
+                }
+            ],
+            "handle": handle,
+            "mock": True,
+        }
+
+    def log_message(self, format, *args):
+        pass

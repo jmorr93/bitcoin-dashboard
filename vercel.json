@@ -1,0 +1,33 @@
+{
+  "buildCommand": "",
+  "outputDirectory": "public",
+  "functions": {
+    "api/*.py": {
+      "runtime": "@vercel/python@4",
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/api/price(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=300, stale-while-revalidate=60" }
+      ]
+    },
+    {
+      "source": "/api/news(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=180, stale-while-revalidate=60" }
+      ]
+    },
+    {
+      "source": "/api/tweets(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=900, stale-while-revalidate=300" }
+      ]
+    }
+  ]
+}
