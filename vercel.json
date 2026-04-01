@@ -1,5 +1,10 @@
 {
   "outputDirectory": "public",
+  "functions": {
+    "api/tweets.py": {
+      "maxDuration": 120
+    }
+  },
   "headers": [
     {
       "source": "/api/price(.*)",

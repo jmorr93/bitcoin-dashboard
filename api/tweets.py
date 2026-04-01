@@ -54,13 +54,14 @@ class handler(BaseHTTPRequestHandler):
 
     def _fetch_from_apify(self, handle, token):
         actor_id = "apidojo~tweet-scraper"
+        # Use the profile URL approach with maxItems to strictly limit results
         run_url = (
             f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
             f"?token={token}"
         )
         payload = json.dumps({
-            "twitterHandles": [handle],
-            "tweetsDesired": 5,
+            "startUrls": [f"https://twitter.com/{handle}"],
+            "maxItems": 3,
             "proxyConfig": {"useApifyProxy": True},
         }).encode()
 
@@ -71,11 +72,12 @@ class handler(BaseHTTPRequestHandler):
             method="POST",
         )
 
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        # Actor can take 1-2 min, Vercel free tier allows up to 60s
+        with urllib.request.urlopen(req, timeout=120) as resp:
             items = json.loads(resp.read())
 
         tweets = []
-        for item in items[:5]:
+        for item in items[:3]:
             tweets.append({
                 "id": item.get("id", ""),
                 "text": item.get("full_text", item.get("text", "")),
