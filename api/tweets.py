@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 import json
 import urllib.request
 import urllib.parse
+import urllib.error
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -39,7 +40,12 @@ def supabase_request(method, path, body=None, upsert=False):
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             return json.loads(resp.read())
-    except Exception:
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode() if e.fp else ""
+        print(f"Supabase error {e.code}: {error_body}")
+        return None
+    except Exception as e:
+        print(f"Supabase request failed: {e}")
         return None
 
 
