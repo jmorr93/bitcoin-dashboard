@@ -80,11 +80,11 @@ class handler(BaseHTTPRequestHandler):
         now = datetime.now(timezone.utc)
         stale_cutoff = (now - timedelta(hours=STALE_THRESHOLD_HOURS)).isoformat()
 
-        # Query Supabase for cached tweets
+        # Query Supabase for cached tweets (up to 20 from last 7 days)
         query = (
             f"tweets?handle=eq.{handle}"
             f"&order=created_at.desc"
-            f"&limit=10"
+            f"&limit=20"
         )
         cached_tweets = supabase_request("GET", query)
 
@@ -102,13 +102,13 @@ class handler(BaseHTTPRequestHandler):
                 is_fresh = True
 
         if is_fresh:
-            tweets = [self._format_tweet(t) for t in cached_tweets[:5]]
+            tweets = [self._format_tweet(t) for t in cached_tweets]
             return {"tweets": tweets, "handle": handle, "source": "cache"}
 
         # Stale or empty — fetch from Apify
         if not token:
             if cached_tweets:
-                tweets = [self._format_tweet(t) for t in cached_tweets[:5]]
+                tweets = [self._format_tweet(t) for t in cached_tweets]
                 return {"tweets": tweets, "handle": handle, "source": "cache_stale"}
             return self._mock_tweets(handle)
 

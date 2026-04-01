@@ -20,39 +20,52 @@ export async function loadTweets() {
     if (!card) return;
 
     if (result.status === 'fulfilled' && result.value.tweets?.length) {
-      renderTweetCard(card, result.value.tweets[0], handle, initials);
+      renderTweetCard(card, result.value.tweets, handle, initials);
     } else {
       renderErrorCard(card, handle, initials);
     }
   });
 }
 
-function renderTweetCard(card, tweet, handle, initials) {
+function renderTweetCard(card, tweets, handle, initials) {
   card.classList.remove('loading');
 
-  const metrics = [
-    { icon: '&#9829;', value: tweet.favorite_count },
-    { icon: '&#8634;', value: tweet.retweet_count },
-    { icon: '&#9993;', value: tweet.reply_count },
-  ].filter(m => m.value > 0);
+  const tweetsHtml = tweets.map(tweet => {
+    const metrics = [
+      { icon: '&#9829;', value: tweet.favorite_count },
+      { icon: '&#8634;', value: tweet.retweet_count },
+      { icon: '&#9993;', value: tweet.reply_count },
+    ].filter(m => m.value > 0);
 
-  const metricsHtml = metrics.length
-    ? `<div class="tweet-metrics">${metrics.map(m =>
-        `<span class="tweet-metric">${m.icon} ${formatNumber(m.value, true)}</span>`
-      ).join('')}</div>`
-    : '';
+    const metricsHtml = metrics.length
+      ? `<div class="tweet-metrics">${metrics.map(m =>
+          `<span class="tweet-metric">${m.icon} ${formatNumber(m.value, true)}</span>`
+        ).join('')}</div>`
+      : '';
+
+    return `
+      <div class="tweet-item">
+        <div class="tweet-item-time">${relativeTime(tweet.created_at)}</div>
+        <p class="tweet-text">${escapeHtml(tweet.text)}</p>
+        ${metricsHtml}
+      </div>
+    `;
+  }).join('');
 
   card.innerHTML = `
     <div class="tweet-card-header">
       <div class="tweet-avatar">${initials}</div>
       <span class="tweet-handle">@${handle}</span>
-      <span class="tweet-time">${relativeTime(tweet.created_at)}</span>
     </div>
-    <p class="tweet-text">${escapeHtml(tweet.text)}</p>
-    ${metricsHtml}
+    <div class="tweet-scroll">
+      ${tweetsHtml}
+    </div>
   `;
 
-  card.onclick = () => window.open(`https://x.com/${handle}`, '_blank');
+  card.querySelector('.tweet-card-header').onclick = (e) => {
+    e.stopPropagation();
+    window.open(`https://x.com/${handle}`, '_blank');
+  };
 }
 
 function renderErrorCard(card, handle, initials) {
@@ -62,9 +75,15 @@ function renderErrorCard(card, handle, initials) {
       <div class="tweet-avatar">${initials}</div>
       <span class="tweet-handle">@${handle}</span>
     </div>
-    <p class="tweet-text" style="color: var(--text-muted);">Unable to load tweets</p>
+    <div class="tweet-scroll">
+      <div class="tweet-item">
+        <p class="tweet-text" style="color: var(--text-muted);">Unable to load tweets</p>
+      </div>
+    </div>
   `;
-  card.onclick = () => window.open(`https://x.com/${handle}`, '_blank');
+  card.querySelector('.tweet-card-header').onclick = () => {
+    window.open(`https://x.com/${handle}`, '_blank');
+  };
 }
 
 function escapeHtml(text) {
