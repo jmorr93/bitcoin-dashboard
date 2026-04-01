@@ -15,7 +15,7 @@ STALE_THRESHOLD_HOURS = 1
 RETENTION_DAYS = 7
 
 
-def supabase_request(method, path, body=None):
+def supabase_request(method, path, body=None, upsert=False):
     """Make a direct REST API call to Supabase (no SDK needed)."""
     url = os.environ.get("SUPABASE_URL", "")
     key = os.environ.get("SUPABASE_KEY", "")
@@ -29,6 +29,9 @@ def supabase_request(method, path, body=None):
         "Content-Type": "application/json",
         "Prefer": "return=representation",
     }
+
+    if upsert:
+        headers["Prefer"] = "resolution=merge-duplicates,return=representation"
 
     data = json.dumps(body).encode() if body else None
     req = urllib.request.Request(full_url, data=data, headers=headers, method=method)
@@ -127,7 +130,7 @@ class handler(BaseHTTPRequestHandler):
                 "reply_count": tweet["reply_count"],
                 "fetched_at": now.isoformat(),
             }
-            supabase_request("POST", "tweets?on_conflict=id", row)
+            supabase_request("POST", "tweets", row, upsert=True)
 
         # Clean up old tweets
         cutoff = (now - timedelta(days=RETENTION_DAYS)).isoformat()
