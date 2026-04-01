@@ -19,15 +19,24 @@ async function init() {
 
   document.getElementById('normalizeToggle').addEventListener('click', toggleNormalize);
 
+  // Refresh tweets button (manual only to save API costs)
+  const refreshBtn = document.getElementById('refreshTweets');
+  refreshBtn.addEventListener('click', async () => {
+    refreshBtn.classList.add('loading');
+    refreshBtn.textContent = '↻ Loading...';
+    await loadTweets();
+    refreshBtn.classList.remove('loading');
+    refreshBtn.innerHTML = '&#8635; Refresh';
+  });
+
+  // Load initial data (tweets only on button click)
   await Promise.allSettled([
     loadPriceData(30),
     updateTicker(),
-    loadTweets(),
     loadNews(),
   ]);
 
   setInterval(updateTicker, 60_000);
-  setInterval(loadTweets, 900_000);
   setInterval(loadNews, 180_000);
 }
 

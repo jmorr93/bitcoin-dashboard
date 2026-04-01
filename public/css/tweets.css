@@ -2,6 +2,29 @@
   flex: 0 0 auto;
 }
 
+.refresh-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.refresh-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.refresh-btn.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .tweets-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
