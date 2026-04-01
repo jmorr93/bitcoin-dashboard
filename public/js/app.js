@@ -19,7 +19,7 @@ async function init() {
 
   document.getElementById('normalizeToggle').addEventListener('click', toggleNormalize);
 
-  // Refresh tweets button (manual only to save API costs)
+  // Refresh tweets button (forces fresh fetch from Apify if cache is stale)
   const refreshBtn = document.getElementById('refreshTweets');
   refreshBtn.addEventListener('click', async () => {
     refreshBtn.classList.add('loading');
@@ -29,10 +29,11 @@ async function init() {
     refreshBtn.innerHTML = '&#8635; Refresh';
   });
 
-  // Load initial data (tweets only on button click)
+  // Load all data on page load (tweets come from Supabase cache if available)
   await Promise.allSettled([
     loadPriceData(30),
     updateTicker(),
+    loadTweets(),
     loadNews(),
   ]);
 

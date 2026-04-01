@@ -176,6 +176,7 @@
 
 .chart-container {
   flex: 1;
+  height: 400px;
   min-height: 300px;
   padding: 0 8px 8px;
   position: relative;

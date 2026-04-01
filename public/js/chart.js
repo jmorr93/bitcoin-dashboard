@@ -5,7 +5,13 @@ let primarySeries = null;
 let comparisonSeries = null;
 
 export function initChart(container) {
+  const rect = container.getBoundingClientRect();
+  const width = rect.width || container.clientWidth || 800;
+  const height = rect.height || container.clientHeight || 400;
+
   chart = LightweightCharts.createChart(container, {
+    width,
+    height,
     layout: {
       background: { type: 'solid', color: 'transparent' },
       textColor: '#8b949e',
@@ -50,7 +56,9 @@ export function initChart(container) {
   const resizeObserver = new ResizeObserver(entries => {
     for (const entry of entries) {
       const { width, height } = entry.contentRect;
-      chart.applyOptions({ width, height });
+      if (width > 0 && height > 0) {
+        chart.applyOptions({ width, height });
+      }
     }
   });
   resizeObserver.observe(container);
