@@ -116,11 +116,12 @@ class handler(BaseHTTPRequestHandler):
 
         # Store in Supabase via upsert
         for tweet in fresh_data.get("tweets", []):
+            created = tweet["created_at"] or now.isoformat()
             row = {
                 "id": tweet["id"],
                 "handle": handle,
                 "text": tweet["text"],
-                "created_at": tweet["created_at"],
+                "created_at": created,
                 "retweet_count": tweet["retweet_count"],
                 "favorite_count": tweet["favorite_count"],
                 "reply_count": tweet["reply_count"],
@@ -170,12 +171,15 @@ class handler(BaseHTTPRequestHandler):
         with urllib.request.urlopen(req, timeout=120) as resp:
             items = json.loads(resp.read())
 
+        now_iso = datetime.now(timezone.utc).isoformat()
         tweets = []
         for item in items[:3]:
+            # Apify returns created_at in various formats, fall back to now
+            created = item.get("created_at") or item.get("createdAt") or item.get("timestamp") or now_iso
             tweets.append({
-                "id": item.get("id", str(time.time())),
+                "id": str(item.get("id", str(time.time()))),
                 "text": item.get("full_text", item.get("text", "")),
-                "created_at": item.get("created_at", ""),
+                "created_at": created,
                 "retweet_count": item.get("retweet_count", 0),
                 "favorite_count": item.get("favorite_count", item.get("like_count", 0)),
                 "reply_count": item.get("reply_count", 0),
