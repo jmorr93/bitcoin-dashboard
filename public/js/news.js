@@ -5,7 +5,7 @@ let allArticles = [];
 
 export async function loadNews() {
   try {
-    const data = await fetchJSON(`/api/news?category=all`);
+    const data = await fetchJSON('/api/news?category=all');
     allArticles = data.articles || [];
     renderNews(filterByCategory(allArticles, currentCategory));
   } catch (err) {

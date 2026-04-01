@@ -1,34 +1,20 @@
 import { fetchJSON, toUnix } from './utils.js';
 import { setComparisonData, clearComparison, normalizeData, applyNormalized, loadPriceData, loadPriceRange } from './chart.js';
 
-let currentMode = null; // 'yoy' | 'mom' | 'pop' | null
+let currentMode = null;
 let normalized = false;
 let currentPrimaryData = null;
 let currentComparisonData = null;
 let currentOffset = 0;
 
-// Current range state (set by range-selector)
 let currentRange = { type: 'days', days: 30 };
 
 export function setCurrentRange(range) {
   currentRange = range;
 }
 
-export function getCurrentMode() {
-  return currentMode;
-}
-
-export function isNormalized() {
-  return normalized;
-}
-
-export function setPrimaryData(data) {
-  currentPrimaryData = data;
-}
-
 export async function toggleComparison(mode) {
   if (currentMode === mode) {
-    // Toggle off
     currentMode = null;
     normalized = false;
     clearComparison();
@@ -57,13 +43,6 @@ export async function toggleNormalize() {
     );
     applyNormalized(primary, comparison);
   } else {
-    // Restore absolute
-    const prices = currentPrimaryData.prices.map(([time, value]) => ({
-      time: Math.floor(time / 1000),
-      value,
-    }));
-    // Re-import primary and comparison at absolute values
-    const { loadPriceData, loadPriceRange, setComparisonData } = await import('./chart.js');
     if (currentRange.type === 'days') {
       await loadPriceData(currentRange.days);
     } else {
@@ -107,7 +86,6 @@ async function loadComparison() {
   currentOffset = fromTs - compFrom;
 
   try {
-    // Fetch primary data for normalization reference
     let primaryUrl;
     if (currentRange.type === 'days') {
       primaryUrl = `/api/price?days=${currentRange.days}`;
@@ -166,7 +144,6 @@ function updateLegend(mode) {
   `;
 }
 
-// Re-run comparison when range changes
 export async function onRangeChange() {
   if (currentMode) {
     await loadComparison();

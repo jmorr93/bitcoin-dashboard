@@ -6,7 +6,7 @@ import os
 import time
 
 _cache = {}
-CACHE_TTL = 900  # 15 minutes
+CACHE_TTL = 900
 
 ALLOWED_HANDLES = {
     "zerohedge", "prestonpysh", "LukeGromen",
@@ -35,11 +35,9 @@ class handler(BaseHTTPRequestHandler):
             else:
                 token = os.environ.get("APIFY_TOKEN", "")
                 if not token:
-                    # Return mock data when no token is configured
                     data = self._mock_tweets(handle)
                 else:
                     data = self._fetch_from_apify(handle, token)
-
                 _cache[cache_key] = {"data": data, "ts": now}
 
             self.send_response(200)
@@ -55,7 +53,6 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": str(e)}).encode())
 
     def _fetch_from_apify(self, handle, token):
-        # Run the Apify actor synchronously and get results
         actor_id = "apidojo~tweet-scraper"
         run_url = (
             f"https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
@@ -77,7 +74,6 @@ class handler(BaseHTTPRequestHandler):
         with urllib.request.urlopen(req, timeout=30) as resp:
             items = json.loads(resp.read())
 
-        # Normalize to our format
         tweets = []
         for item in items[:5]:
             tweets.append({
@@ -93,19 +89,16 @@ class handler(BaseHTTPRequestHandler):
         return {"tweets": tweets, "handle": handle}
 
     def _mock_tweets(self, handle):
-        """Return placeholder data when APIFY_TOKEN is not set."""
         return {
-            "tweets": [
-                {
-                    "id": "mock_1",
-                    "text": f"Configure APIFY_TOKEN env var to see live tweets from @{handle}",
-                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "retweet_count": 0,
-                    "favorite_count": 0,
-                    "reply_count": 0,
-                    "handle": handle,
-                }
-            ],
+            "tweets": [{
+                "id": "mock_1",
+                "text": f"Configure APIFY_TOKEN env var to see live tweets from @{handle}",
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "retweet_count": 0,
+                "favorite_count": 0,
+                "reply_count": 0,
+                "handle": handle,
+            }],
             "handle": handle,
             "mock": True,
         }

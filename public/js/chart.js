@@ -47,7 +47,6 @@ export function initChart(container) {
     priceLineStyle: 2,
   });
 
-  // Handle resize
   const resizeObserver = new ResizeObserver(entries => {
     for (const entry of entries) {
       const { width, height } = entry.contentRect;
@@ -92,7 +91,7 @@ export function setComparisonData(data, offset, normalize = false) {
   comparisonSeries = chart.addLineSeries({
     color: 'rgba(139, 148, 158, 0.6)',
     lineWidth: 1,
-    lineStyle: 2, // dashed
+    lineStyle: 2,
     crosshairMarkerVisible: false,
     lastValueVisible: false,
     priceLineVisible: false,

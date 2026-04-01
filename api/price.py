@@ -5,7 +5,7 @@ import urllib.parse
 import time
 
 _cache = {}
-CACHE_TTL = 300  # 5 minutes
+CACHE_TTL = 300
 
 
 class handler(BaseHTTPRequestHandler):
@@ -15,7 +15,6 @@ class handler(BaseHTTPRequestHandler):
             days = params.get("days", ["30"])[0]
             vs = params.get("vs", ["usd"])[0]
 
-            # Validate inputs
             if not days.isdigit() or int(days) < 1 or int(days) > 365:
                 days = "30"
             if vs not in ("usd", "eur", "gbp"):
@@ -49,4 +48,4 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": str(e)}).encode())
 
     def log_message(self, format, *args):
-        pass  # Suppress default logging
+        pass

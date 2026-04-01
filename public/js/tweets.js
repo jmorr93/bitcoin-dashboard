@@ -20,8 +20,7 @@ export async function loadTweets() {
     if (!card) return;
 
     if (result.status === 'fulfilled' && result.value.tweets?.length) {
-      const tweet = result.value.tweets[0]; // Latest tweet
-      renderTweetCard(card, tweet, handle, initials);
+      renderTweetCard(card, result.value.tweets[0], handle, initials);
     } else {
       renderErrorCard(card, handle, initials);
     }
@@ -53,9 +52,7 @@ function renderTweetCard(card, tweet, handle, initials) {
     ${metricsHtml}
   `;
 
-  card.onclick = () => {
-    window.open(`https://x.com/${handle}`, '_blank');
-  };
+  card.onclick = () => window.open(`https://x.com/${handle}`, '_blank');
 }
 
 function renderErrorCard(card, handle, initials) {
@@ -67,9 +64,7 @@ function renderErrorCard(card, handle, initials) {
     </div>
     <p class="tweet-text" style="color: var(--text-muted);">Unable to load tweets</p>
   `;
-  card.onclick = () => {
-    window.open(`https://x.com/${handle}`, '_blank');
-  };
+  card.onclick = () => window.open(`https://x.com/${handle}`, '_blank');
 }
 
 function escapeHtml(text) {

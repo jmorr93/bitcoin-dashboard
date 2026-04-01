@@ -6,7 +6,7 @@ import time
 import os
 
 _cache = {}
-CACHE_TTL = 180  # 3 minutes
+CACHE_TTL = 180
 
 
 class handler(BaseHTTPRequestHandler):
@@ -25,19 +25,13 @@ class handler(BaseHTTPRequestHandler):
             else:
                 articles = []
 
-                # Source 1: CryptoPanic API (BTC news)
                 if category in ("all", "bitcoin"):
                     articles.extend(self._fetch_cryptopanic())
-
-                # Source 2: CoinGecko status/trending (fallback crypto news)
-                if category in ("all", "bitcoin"):
                     articles.extend(self._fetch_coingecko_news())
 
-                # Source 3: RSS feeds for macro news
                 if category in ("all", "macro"):
                     articles.extend(self._fetch_rss_news())
 
-                # Sort by timestamp descending, dedupe by title
                 seen = set()
                 unique = []
                 for a in sorted(articles, key=lambda x: x.get("timestamp", ""), reverse=True):
@@ -63,15 +57,13 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": str(e)}).encode())
 
     def _fetch_cryptopanic(self):
-        """Fetch from CryptoPanic API."""
         articles = []
         try:
             token = os.environ.get("CRYPTOPANIC_TOKEN", "")
             if token:
                 url = f"https://cryptopanic.com/api/v1/posts/?auth_token={token}&currencies=BTC&kind=news&public=true"
             else:
-                # Public feed (limited)
-                url = "https://cryptopanic.com/api/v1/posts/?currencies=BTC&kind=news&public=true"
+                url = "https://cryptopanic.com/api/free/v1/posts/?currencies=BTC&kind=news&public=true"
 
             req = urllib.request.Request(url, headers={
                 "Accept": "application/json",
@@ -93,7 +85,6 @@ class handler(BaseHTTPRequestHandler):
         return articles
 
     def _fetch_coingecko_news(self):
-        """Fetch trending/status from CoinGecko as a news proxy."""
         articles = []
         try:
             url = "https://api.coingecko.com/api/v3/search/trending"
@@ -101,7 +92,6 @@ class handler(BaseHTTPRequestHandler):
             with urllib.request.urlopen(req, timeout=5) as resp:
                 data = json.loads(resp.read())
 
-            # Extract trending coins as "news" items
             for coin in data.get("coins", [])[:5]:
                 item = coin.get("item", {})
                 articles.append({
@@ -116,11 +106,9 @@ class handler(BaseHTTPRequestHandler):
         return articles
 
     def _fetch_rss_news(self):
-        """Fetch macro/financial news from RSS feeds."""
         articles = []
         feeds = [
             ("https://feeds.bloomberg.com/markets/news.rss", "Bloomberg", "macro"),
-            ("https://feeds.reuters.com/reuters/businessNews", "Reuters", "macro"),
             ("https://www.coindesk.com/arc/outboundfeeds/rss/", "CoinDesk", "bitcoin"),
         ]
 
@@ -132,7 +120,6 @@ class handler(BaseHTTPRequestHandler):
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     xml = resp.read().decode("utf-8", errors="replace")
 
-                # Simple XML parsing without feedparser (avoid import issues)
                 items = xml.split("<item>")[1:]
                 for item_xml in items[:10]:
                     title = self._extract_tag(item_xml, "title")
@@ -140,7 +127,6 @@ class handler(BaseHTTPRequestHandler):
                     pub_date = self._extract_tag(item_xml, "pubDate")
 
                     if title:
-                        # Convert RSS date to ISO format
                         iso_date = self._parse_rss_date(pub_date) if pub_date else ""
                         articles.append({
                             "title": title,
@@ -155,7 +141,6 @@ class handler(BaseHTTPRequestHandler):
         return articles
 
     def _extract_tag(self, xml, tag):
-        """Extract text content from an XML tag."""
         start = xml.find(f"<{tag}>")
         if start == -1:
             start = xml.find(f"<{tag} ")
@@ -166,7 +151,6 @@ class handler(BaseHTTPRequestHandler):
         if end == -1:
             return ""
         text = xml[start:end].strip()
-        # Handle CDATA
         if text.startswith("<![CDATA["):
             text = text[9:]
         if text.endswith("]]>"):
@@ -174,7 +158,6 @@ class handler(BaseHTTPRequestHandler):
         return text
 
     def _parse_rss_date(self, date_str):
-        """Best-effort parse of RSS date formats to ISO."""
         try:
             from email.utils import parsedate_to_datetime
             dt = parsedate_to_datetime(date_str)

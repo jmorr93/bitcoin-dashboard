@@ -5,7 +5,7 @@ import urllib.parse
 import time
 
 _cache = {}
-CACHE_TTL = 300  # 5 minutes
+CACHE_TTL = 300
 
 
 class handler(BaseHTTPRequestHandler):
@@ -20,10 +20,9 @@ class handler(BaseHTTPRequestHandler):
                 self.send_response(400)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": "from and to parameters required"}).encode())
+                self.wfile.write(json.dumps({"error": "from and to required"}).encode())
                 return
 
-            # Validate timestamps
             try:
                 from_ts = str(int(float(from_ts)))
                 to_ts = str(int(float(to_ts)))
