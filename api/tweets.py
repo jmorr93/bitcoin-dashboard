@@ -11,19 +11,33 @@ ALLOWED_HANDLES = {
     "jackmallers", "LynAldenContact", "willywoo",
 }
 
-# How old the latest tweet can be before we fetch fresh ones
 STALE_THRESHOLD_HOURS = 1
-# How many days of tweets to keep in the database
 RETENTION_DAYS = 7
 
 
-def get_supabase():
-    from supabase import create_client
+def supabase_request(method, path, body=None):
+    """Make a direct REST API call to Supabase (no SDK needed)."""
     url = os.environ.get("SUPABASE_URL", "")
     key = os.environ.get("SUPABASE_KEY", "")
     if not url or not key:
         return None
-    return create_client(url, key)
+
+    full_url = f"{url}/rest/v1/{path}"
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+
+    data = json.dumps(body).encode() if body else None
+    req = urllib.request.Request(full_url, data=data, headers=headers, method=method)
+
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read())
+    except Exception:
+        return None
 
 
 class handler(BaseHTTPRequestHandler):
@@ -39,11 +53,11 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "invalid handle"}).encode())
                 return
 
-            sb = get_supabase()
             token = os.environ.get("APIFY_TOKEN", "")
+            has_supabase = bool(os.environ.get("SUPABASE_URL"))
 
-            if sb:
-                data = self._get_with_cache(sb, handle, token)
+            if has_supabase:
+                data = self._get_with_cache(handle, token)
             elif token:
                 data = self._fetch_from_apify(handle, token)
             else:
@@ -61,24 +75,26 @@ class handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode())
 
-    def _get_with_cache(self, sb, handle, token):
+    def _get_with_cache(self, handle, token):
         """Check Supabase for recent tweets. Fetch from Apify only if stale."""
         now = datetime.now(timezone.utc)
         stale_cutoff = (now - timedelta(hours=STALE_THRESHOLD_HOURS)).isoformat()
 
-        # Get tweets from the last 7 days for this handle
-        result = (
-            sb.table("tweets")
-            .select("*")
-            .eq("handle", handle)
-            .order("created_at", desc=True)
-            .limit(10)
-            .execute()
+        # Query Supabase for cached tweets
+        query = (
+            f"tweets?handle=eq.{handle}"
+            f"&order=created_at.desc"
+            f"&limit=10"
         )
+        cached_tweets = supabase_request("GET", query)
 
-        cached_tweets = result.data or []
+        if cached_tweets is None:
+            # Supabase unavailable, fall back
+            if token:
+                return self._fetch_from_apify(handle, token)
+            return self._mock_tweets(handle)
 
-        # Check if we have a recent fetch (fetched_at within the last hour)
+        # Check if cache is fresh
         is_fresh = False
         if cached_tweets:
             latest_fetched = cached_tweets[0].get("fetched_at", "")
@@ -86,7 +102,6 @@ class handler(BaseHTTPRequestHandler):
                 is_fresh = True
 
         if is_fresh:
-            # Return cached tweets
             tweets = [self._format_tweet(t) for t in cached_tweets[:5]]
             return {"tweets": tweets, "handle": handle, "source": "cache"}
 
@@ -97,35 +112,32 @@ class handler(BaseHTTPRequestHandler):
                 return {"tweets": tweets, "handle": handle, "source": "cache_stale"}
             return self._mock_tweets(handle)
 
-        fresh_tweets = self._fetch_from_apify(handle, token)
+        fresh_data = self._fetch_from_apify(handle, token)
 
-        # Store in Supabase
-        for tweet in fresh_tweets.get("tweets", []):
-            try:
-                sb.table("tweets").upsert({
-                    "id": tweet["id"],
-                    "handle": handle,
-                    "text": tweet["text"],
-                    "created_at": tweet["created_at"],
-                    "retweet_count": tweet["retweet_count"],
-                    "favorite_count": tweet["favorite_count"],
-                    "reply_count": tweet["reply_count"],
-                    "fetched_at": now.isoformat(),
-                }, on_conflict="id").execute()
-            except Exception:
-                pass
+        # Store in Supabase via upsert
+        for tweet in fresh_data.get("tweets", []):
+            row = {
+                "id": tweet["id"],
+                "handle": handle,
+                "text": tweet["text"],
+                "created_at": tweet["created_at"],
+                "retweet_count": tweet["retweet_count"],
+                "favorite_count": tweet["favorite_count"],
+                "reply_count": tweet["reply_count"],
+                "fetched_at": now.isoformat(),
+            }
+            supabase_request("POST", "tweets?on_conflict=id", row)
 
-        # Clean up tweets older than 7 days
-        try:
-            cutoff = (now - timedelta(days=RETENTION_DAYS)).isoformat()
-            sb.table("tweets").delete().eq("handle", handle).lt("created_at", cutoff).execute()
-        except Exception:
-            pass
+        # Clean up old tweets
+        cutoff = (now - timedelta(days=RETENTION_DAYS)).isoformat()
+        supabase_request(
+            "DELETE",
+            f"tweets?handle=eq.{handle}&created_at=lt.{cutoff}"
+        )
 
-        return fresh_tweets
+        return fresh_data
 
     def _format_tweet(self, row):
-        """Convert a Supabase row to our tweet format."""
         return {
             "id": row.get("id", ""),
             "text": row.get("text", ""),
