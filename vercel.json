@@ -1,11 +1,6 @@
 {
   "buildCommand": "",
   "outputDirectory": "public",
-  "functions": {
-    "api/*.py": {
-      "maxDuration": 10
-    }
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
