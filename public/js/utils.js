@@ -31,10 +31,13 @@ export function formatNumber(value, compact = false) {
 }
 
 export function relativeTime(dateStr) {
-  const now = Date.now();
+  if (!dateStr) return '';
   const then = new Date(dateStr).getTime();
+  if (isNaN(then)) return '';
+  const now = Date.now();
   const diff = (now - then) / 1000;
 
+  if (diff < 0) return 'now';
   if (diff < 60) return 'now';
   if (diff < 3600) return Math.floor(diff / 60) + 'm';
   if (diff < 86400) return Math.floor(diff / 3600) + 'h';
