@@ -8,6 +8,21 @@ import os
 _cache = {}
 CACHE_TTL = 180
 
+# All RSS feeds organized by category
+RSS_FEEDS = [
+    # Macro / Markets
+    ("https://feeds.bloomberg.com/markets/news.rss", "Bloomberg", "macro"),
+    ("https://feeds.reuters.com/reuters/businessNews", "Reuters", "macro"),
+    ("https://www.cnbc.com/id/20910258/device/rss/rss.html", "CNBC", "macro"),
+    ("https://feeds.wsj.com/rss/RSSMarketsMain.xml", "WSJ", "macro"),
+    ("https://www.federalreserve.gov/feeds/press_all.xml", "Fed Reserve", "macro"),
+    # Bitcoin / Crypto
+    ("https://www.coindesk.com/arc/outboundfeeds/rss/", "CoinDesk", "bitcoin"),
+    ("https://www.theblock.co/rss.xml", "The Block", "bitcoin"),
+    ("https://bitcoinmagazine.com/feed", "Bitcoin Magazine", "bitcoin"),
+    ("https://cointelegraph.com/rss", "Cointelegraph", "bitcoin"),
+]
+
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -27,11 +42,11 @@ class handler(BaseHTTPRequestHandler):
 
                 if category in ("all", "bitcoin"):
                     articles.extend(self._fetch_cryptopanic())
-                    articles.extend(self._fetch_coingecko_news())
 
-                if category in ("all", "macro"):
-                    articles.extend(self._fetch_rss_news())
+                # Fetch RSS feeds (filtered by category)
+                articles.extend(self._fetch_rss_news(category))
 
+                # Sort by timestamp, dedupe by title
                 seen = set()
                 unique = []
                 for a in sorted(articles, key=lambda x: x.get("timestamp", ""), reverse=True):
@@ -39,7 +54,7 @@ class handler(BaseHTTPRequestHandler):
                     if title_key not in seen:
                         seen.add(title_key)
                         unique.append(a)
-                unique = unique[:50]
+                unique = unique[:75]
 
                 data = {"articles": unique, "category": category}
                 _cache[cache_key] = {"data": data, "ts": now}
@@ -84,38 +99,18 @@ class handler(BaseHTTPRequestHandler):
             pass
         return articles
 
-    def _fetch_coingecko_news(self):
+    def _fetch_rss_news(self, category):
         articles = []
-        try:
-            url = "https://api.coingecko.com/api/v3/search/trending"
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read())
 
-            for coin in data.get("coins", [])[:5]:
-                item = coin.get("item", {})
-                articles.append({
-                    "title": f"{item.get('name', '')} ({item.get('symbol', '')}) trending on CoinGecko",
-                    "url": f"https://www.coingecko.com/en/coins/{item.get('id', '')}",
-                    "source": "CoinGecko",
-                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "category": "bitcoin",
-                })
-        except Exception:
-            pass
-        return articles
+        for feed_url, source, cat in RSS_FEEDS:
+            # Skip feeds that don't match the requested category
+            if category != "all" and cat != category:
+                continue
 
-    def _fetch_rss_news(self):
-        articles = []
-        feeds = [
-            ("https://feeds.bloomberg.com/markets/news.rss", "Bloomberg", "macro"),
-            ("https://www.coindesk.com/arc/outboundfeeds/rss/", "CoinDesk", "bitcoin"),
-        ]
-
-        for feed_url, source, cat in feeds:
             try:
                 req = urllib.request.Request(feed_url, headers={
                     "User-Agent": "BTCDashboard/1.0",
+                    "Accept": "application/rss+xml, application/xml, text/xml",
                 })
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     xml = resp.read().decode("utf-8", errors="replace")
