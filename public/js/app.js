@@ -1,4 +1,4 @@
-import { initChart, loadPriceData } from './chart.js';
+import { initChart, loadPriceData, loadMovingAverages } from './chart.js';
 import { updateTicker } from './ticker.js';
 import { initRangeSelector } from './range-selector.js';
 import { toggleComparison, toggleNormalize } from './comparison.js';
@@ -32,6 +32,7 @@ async function init() {
   // Load all data on page load (tweets come from Supabase cache if available)
   await Promise.allSettled([
     loadPriceData(30),
+    loadMovingAverages(),
     updateTicker(),
     loadTweets(),
     loadNews(),

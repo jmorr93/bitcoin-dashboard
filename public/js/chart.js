@@ -3,6 +3,14 @@ import { fetchJSON, formatCurrency, formatDate } from './utils.js';
 let chart = null;
 let primarySeries = null;
 let comparisonSeries = null;
+let maSeries = {};
+
+const MA_CONFIG = {
+  ma20:  { color: '#22d3ee', label: '20D MA',  lineWidth: 1 },
+  ma50:  { color: '#a78bfa', label: '50D MA',  lineWidth: 1 },
+  ma100: { color: '#fb923c', label: '100D MA', lineWidth: 1 },
+  ma200: { color: '#f472b6', label: '200D MA', lineWidth: 1 },
+};
 
 export function initChart(container) {
   const rect = container.getBoundingClientRect();
@@ -165,6 +173,58 @@ export function applyNormalized(primaryPoints, comparisonPoints) {
 
   comparisonSeries.setData(comparisonPoints);
   chart.timeScale().fitContent();
+}
+
+export async function loadMovingAverages() {
+  const data = await fetchJSON('/api/moving_averages');
+
+  // Remove existing MA series
+  for (const key of Object.keys(maSeries)) {
+    if (maSeries[key]) {
+      chart.removeSeries(maSeries[key]);
+    }
+  }
+  maSeries = {};
+
+  for (const [key, cfg] of Object.entries(MA_CONFIG)) {
+    const raw = data[key];
+    if (!raw || raw.length === 0) continue;
+
+    const series = chart.addLineSeries({
+      color: cfg.color,
+      lineWidth: cfg.lineWidth,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+
+    series.setData(
+      raw.map(([time, value]) => ({
+        time: Math.floor(time / 1000),
+        value,
+      }))
+    );
+
+    maSeries[key] = series;
+  }
+
+  updateMALegend();
+}
+
+function updateMALegend() {
+  const legend = document.getElementById('chartLegend');
+  if (!legend) return;
+
+  // Clear existing MA legend items
+  legend.querySelectorAll('.ma-legend-item').forEach(el => el.remove());
+
+  for (const [key, cfg] of Object.entries(MA_CONFIG)) {
+    if (!maSeries[key]) continue;
+    const item = document.createElement('span');
+    item.className = 'chart-legend-item ma-legend-item';
+    item.innerHTML = `<span class="chart-legend-dot" style="background:${cfg.color}"></span>${cfg.label}`;
+    legend.appendChild(item);
+  }
 }
 
 export function getChart() {
