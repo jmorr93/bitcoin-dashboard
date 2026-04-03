@@ -4,12 +4,14 @@ let chart = null;
 let primarySeries = null;
 let comparisonSeries = null;
 let maSeries = {};
+let maData = {};       // cached raw data per MA key
+let maVisible = {};    // track which MAs are currently visible
 
 const MA_CONFIG = {
-  ma20:  { color: '#22d3ee', label: '20D MA',  lineWidth: 1 },
-  ma50:  { color: '#a78bfa', label: '50D MA',  lineWidth: 1 },
-  ma100: { color: '#fb923c', label: '100D MA', lineWidth: 1 },
-  ma200: { color: '#f472b6', label: '200D MA', lineWidth: 1 },
+  ma20:  { color: '#22d3ee', label: '20D MA',  lineWidth: 1, defaultOn: false },
+  ma50:  { color: '#a78bfa', label: '50D MA',  lineWidth: 1, defaultOn: true },
+  ma100: { color: '#fb923c', label: '100D MA', lineWidth: 1, defaultOn: false },
+  ma200: { color: '#f472b6', label: '200D MA', lineWidth: 1, defaultOn: true },
 };
 
 export function initChart(container) {
@@ -185,30 +187,71 @@ export async function loadMovingAverages() {
     }
   }
   maSeries = {};
+  maData = {};
 
+  // Cache all MA data and only render those marked defaultOn
   for (const [key, cfg] of Object.entries(MA_CONFIG)) {
     const raw = data[key];
     if (!raw || raw.length === 0) continue;
 
-    const series = chart.addLineSeries({
-      color: cfg.color,
-      lineWidth: cfg.lineWidth,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    });
+    maData[key] = raw.map(([time, value]) => ({
+      time: Math.floor(time / 1000),
+      value,
+    }));
 
-    series.setData(
-      raw.map(([time, value]) => ({
-        time: Math.floor(time / 1000),
-        value,
-      }))
-    );
+    maVisible[key] = cfg.defaultOn;
 
-    maSeries[key] = series;
+    if (cfg.defaultOn) {
+      _addMASeries(key);
+    }
   }
 
   updateMALegend();
+  updateMAToggles();
+}
+
+function _addMASeries(key) {
+  const cfg = MA_CONFIG[key];
+  if (!cfg || !maData[key]) return;
+
+  const series = chart.addLineSeries({
+    color: cfg.color,
+    lineWidth: cfg.lineWidth,
+    crosshairMarkerVisible: false,
+    lastValueVisible: false,
+    priceLineVisible: false,
+  });
+  series.setData(maData[key]);
+  maSeries[key] = series;
+}
+
+export function toggleMA(key) {
+  if (!MA_CONFIG[key] || !maData[key]) return;
+
+  if (maVisible[key]) {
+    // Hide
+    if (maSeries[key]) {
+      chart.removeSeries(maSeries[key]);
+      delete maSeries[key];
+    }
+    maVisible[key] = false;
+  } else {
+    // Show
+    _addMASeries(key);
+    maVisible[key] = true;
+  }
+
+  updateMALegend();
+  updateMAToggles();
+}
+
+function updateMAToggles() {
+  for (const key of Object.keys(MA_CONFIG)) {
+    const btn = document.querySelector(`.ma-toggle[data-ma="${key}"]`);
+    if (btn) {
+      btn.classList.toggle('active', !!maVisible[key]);
+    }
+  }
 }
 
 function updateMALegend() {

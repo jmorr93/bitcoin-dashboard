@@ -1,4 +1,4 @@
-import { initChart, loadPriceData, loadMovingAverages } from './chart.js';
+import { initChart, loadPriceData, loadMovingAverages, toggleMA } from './chart.js';
 import { updateTicker } from './ticker.js';
 import { initRangeSelector } from './range-selector.js';
 import { toggleComparison, toggleNormalize } from './comparison.js';
@@ -18,6 +18,11 @@ async function init() {
   });
 
   document.getElementById('normalizeToggle').addEventListener('click', toggleNormalize);
+
+  document.getElementById('maToggles').addEventListener('click', (e) => {
+    const btn = e.target.closest('.ma-toggle');
+    if (btn) toggleMA(btn.dataset.ma);
+  });
 
   // Refresh tweets button (forces fresh fetch from Apify if cache is stale)
   const refreshBtn = document.getElementById('refreshTweets');

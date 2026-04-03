@@ -210,6 +210,38 @@
   border-radius: 50%;
 }
 
+.ma-toggles {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  margin-left: 8px;
+}
+
+.ma-toggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.ma-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.ma-toggle.active {
+  background: var(--bg-secondary);
+  color: var(--ma-color);
+  box-shadow: var(--shadow);
+}
+
 .normalize-toggle {
   background: none;
   border: 1px solid var(--border);
