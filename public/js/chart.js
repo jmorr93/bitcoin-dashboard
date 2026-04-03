@@ -220,6 +220,7 @@ function _addMASeries(key) {
     crosshairMarkerVisible: false,
     lastValueVisible: false,
     priceLineVisible: false,
+    autoscaleInfoProvider: () => null,   // don't let MAs stretch the y-axis
   });
   series.setData(maData[key]);
   maSeries[key] = series;
