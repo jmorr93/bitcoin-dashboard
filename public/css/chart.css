@@ -242,6 +242,11 @@
   box-shadow: var(--shadow);
 }
 
+.ma-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
 .normalize-toggle {
   background: none;
   border: 1px solid var(--border);

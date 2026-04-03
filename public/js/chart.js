@@ -6,13 +6,34 @@ let comparisonSeries = null;
 let maSeries = {};
 let maData = {};       // cached raw data per MA key
 let maVisible = {};    // track which MAs are currently visible
+let activeDays = 30;   // current time range in days
 
 const MA_CONFIG = {
-  ma20:  { color: '#22d3ee', label: '20D MA',  lineWidth: 1, defaultOn: false },
-  ma50:  { color: '#a78bfa', label: '50D MA',  lineWidth: 1, defaultOn: true },
-  ma100: { color: '#fb923c', label: '100D MA', lineWidth: 1, defaultOn: false },
-  ma200: { color: '#f472b6', label: '200D MA', lineWidth: 1, defaultOn: true },
+  ma20:  { color: '#22d3ee', label: '20D MA',  lineWidth: 1, minDays: 20 },
+  ma50:  { color: '#a78bfa', label: '50D MA',  lineWidth: 1, minDays: 50 },
+  ma100: { color: '#fb923c', label: '100D MA', lineWidth: 1, minDays: 100 },
+  ma200: { color: '#f472b6', label: '200D MA', lineWidth: 1, minDays: 200 },
 };
+
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function _tickMarkFormatter(time, tickMarkType, locale) {
+  const d = new Date(time * 1000);
+  if (activeDays <= 1) {
+    // 1D — show hours
+    return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  if (activeDays <= 7) {
+    // 1W — show day + month
+    return `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}`;
+  }
+  if (activeDays <= 90) {
+    // 1M / 3M — show month + day
+    return `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}`;
+  }
+  // 6M / 1Y — show month + year
+  return `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
 
 export function initChart(container) {
   const rect = container.getBoundingClientRect();
@@ -46,6 +67,9 @@ export function initChart(container) {
       timeVisible: true,
       secondsVisible: false,
       rightOffset: 5,
+      fixLeftEdge: true,
+      fixRightEdge: true,
+      tickMarkFormatter: _tickMarkFormatter,
     },
     handleScroll: { vertTouchDrag: false },
     handleScale: { axisPressedMouseMove: true },
@@ -73,41 +97,43 @@ export function initChart(container) {
   });
   resizeObserver.observe(container);
 
-  // When visible range changes (zoom/pan/range switch), re-clip MA data
-  chart.timeScale().subscribeVisibleTimeRangeChange(() => {
-    _refreshVisibleMAs();
-  });
-
   return chart;
 }
 
-function _refreshVisibleMAs() {
-  for (const key of Object.keys(maSeries)) {
-    if (maSeries[key] && maData[key]) {
-      maSeries[key].setData(_getVisibleMaData(key));
-    }
-  }
-}
-
 export async function loadPriceData(days = 30) {
+  activeDays = days;
   const data = await fetchJSON(`/api/price?days=${days}`);
   const prices = data.prices.map(([time, value]) => ({
     time: Math.floor(time / 1000),
     value,
   }));
   primarySeries.setData(prices);
+
+  // Update time scale visibility for the new range
+  chart.timeScale().applyOptions({
+    timeVisible: days <= 7,  // show time-of-day only for 1D/1W
+  });
+
   chart.timeScale().fitContent();
+  _applyMAForRange();
   return data;
 }
 
 export async function loadPriceRange(fromTs, toTs) {
+  activeDays = Math.round((toTs - fromTs) / 86400);
   const data = await fetchJSON(`/api/price_range?from=${fromTs}&to=${toTs}`);
   const prices = data.prices.map(([time, value]) => ({
     time: Math.floor(time / 1000),
     value,
   }));
   primarySeries.setData(prices);
+
+  chart.timeScale().applyOptions({
+    timeVisible: activeDays <= 7,
+  });
+
   chart.timeScale().fitContent();
+  _applyMAForRange();
   return data;
 }
 
@@ -193,17 +219,12 @@ export function applyNormalized(primaryPoints, comparisonPoints) {
 export async function loadMovingAverages() {
   const data = await fetchJSON('/api/moving_averages');
 
-  // Remove existing MA series
-  for (const key of Object.keys(maSeries)) {
-    if (maSeries[key]) {
-      chart.removeSeries(maSeries[key]);
-    }
-  }
-  maSeries = {};
+  // Remove any existing MA series from chart
+  _removeAllMASeries();
   maData = {};
 
-  // Cache all MA data and only render those marked defaultOn
-  for (const [key, cfg] of Object.entries(MA_CONFIG)) {
+  // Cache all MA data (don't render yet — _applyMAForRange handles that)
+  for (const [key] of Object.entries(MA_CONFIG)) {
     const raw = data[key];
     if (!raw || raw.length === 0) continue;
 
@@ -211,34 +232,52 @@ export async function loadMovingAverages() {
       time: Math.floor(time / 1000),
       value,
     }));
+  }
 
-    maVisible[key] = cfg.defaultOn;
+  _applyMAForRange();
+}
 
-    if (cfg.defaultOn) {
-      _addMASeries(key);
+function _isMAEligible(key) {
+  return activeDays >= MA_CONFIG[key].minDays;
+}
+
+/** Show/hide MAs based on current activeDays and user toggle state. */
+function _applyMAForRange() {
+  for (const [key, cfg] of Object.entries(MA_CONFIG)) {
+    const eligible = _isMAEligible(key);
+    const btn = document.querySelector(`.ma-toggle[data-ma="${key}"]`);
+
+    if (!eligible) {
+      // Remove series if showing, disable button
+      if (maSeries[key]) {
+        chart.removeSeries(maSeries[key]);
+        delete maSeries[key];
+      }
+      if (btn) {
+        btn.classList.remove('active');
+        btn.disabled = true;
+        btn.style.opacity = '0.3';
+      }
+      maVisible[key] = false;
+    } else {
+      // Enable button
+      if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = '';
+      }
+      // Auto-show eligible MAs that the user hasn't explicitly toggled off
+      // On first load or range change, default: show if user had it on OR if it wasn't set yet
+      if (maVisible[key] === undefined) {
+        // First time: show 50 and 200 by default when eligible
+        maVisible[key] = (key === 'ma50' || key === 'ma200');
+      }
+      if (maVisible[key] && !maSeries[key] && maData[key]) {
+        _addMASeries(key);
+      }
     }
   }
 
   updateMALegend();
-  updateMAToggles();
-}
-
-function _getVisibleMaData(key) {
-  // Clip MA data to the primary price series time range so MAs don't
-  // expand the time axis (which was causing the y-axis to stretch).
-  const points = maData[key];
-  if (!points || !points.length) return points;
-
-  const timeRange = chart.timeScale().getVisibleRange();
-  if (!timeRange) {
-    // Fallback: use primary series data bounds
-    const pd = primarySeries ? primarySeries.data?.() : null;
-    if (!pd || !pd.length) return points;
-    const first = pd[0].time;
-    const last = pd[pd.length - 1].time;
-    return points.filter(p => p.time >= first && p.time <= last);
-  }
-  return points.filter(p => p.time >= timeRange.from && p.time <= timeRange.to);
 }
 
 function _addMASeries(key) {
@@ -252,37 +291,36 @@ function _addMASeries(key) {
     lastValueVisible: false,
     priceLineVisible: false,
   });
-  series.setData(_getVisibleMaData(key));
+  series.setData(maData[key]);
   maSeries[key] = series;
 }
 
+function _removeAllMASeries() {
+  for (const key of Object.keys(maSeries)) {
+    if (maSeries[key]) {
+      chart.removeSeries(maSeries[key]);
+    }
+  }
+  maSeries = {};
+}
+
 export function toggleMA(key) {
-  if (!MA_CONFIG[key] || !maData[key]) return;
+  if (!MA_CONFIG[key] || !maData[key] || !_isMAEligible(key)) return;
 
   if (maVisible[key]) {
-    // Hide
     if (maSeries[key]) {
       chart.removeSeries(maSeries[key]);
       delete maSeries[key];
     }
     maVisible[key] = false;
   } else {
-    // Show
     _addMASeries(key);
     maVisible[key] = true;
   }
 
+  const btn = document.querySelector(`.ma-toggle[data-ma="${key}"]`);
+  if (btn) btn.classList.toggle('active', !!maVisible[key]);
   updateMALegend();
-  updateMAToggles();
-}
-
-function updateMAToggles() {
-  for (const key of Object.keys(MA_CONFIG)) {
-    const btn = document.querySelector(`.ma-toggle[data-ma="${key}"]`);
-    if (btn) {
-      btn.classList.toggle('active', !!maVisible[key]);
-    }
-  }
 }
 
 function updateMALegend() {
