@@ -73,7 +73,20 @@ export function initChart(container) {
   });
   resizeObserver.observe(container);
 
+  // When visible range changes (zoom/pan/range switch), re-clip MA data
+  chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+    _refreshVisibleMAs();
+  });
+
   return chart;
+}
+
+function _refreshVisibleMAs() {
+  for (const key of Object.keys(maSeries)) {
+    if (maSeries[key] && maData[key]) {
+      maSeries[key].setData(_getVisibleMaData(key));
+    }
+  }
 }
 
 export async function loadPriceData(days = 30) {
@@ -210,6 +223,24 @@ export async function loadMovingAverages() {
   updateMAToggles();
 }
 
+function _getVisibleMaData(key) {
+  // Clip MA data to the primary price series time range so MAs don't
+  // expand the time axis (which was causing the y-axis to stretch).
+  const points = maData[key];
+  if (!points || !points.length) return points;
+
+  const timeRange = chart.timeScale().getVisibleRange();
+  if (!timeRange) {
+    // Fallback: use primary series data bounds
+    const pd = primarySeries ? primarySeries.data?.() : null;
+    if (!pd || !pd.length) return points;
+    const first = pd[0].time;
+    const last = pd[pd.length - 1].time;
+    return points.filter(p => p.time >= first && p.time <= last);
+  }
+  return points.filter(p => p.time >= timeRange.from && p.time <= timeRange.to);
+}
+
 function _addMASeries(key) {
   const cfg = MA_CONFIG[key];
   if (!cfg || !maData[key]) return;
@@ -220,9 +251,8 @@ function _addMASeries(key) {
     crosshairMarkerVisible: false,
     lastValueVisible: false,
     priceLineVisible: false,
-    autoscaleInfoProvider: () => null,   // don't let MAs stretch the y-axis
   });
-  series.setData(maData[key]);
+  series.setData(_getVisibleMaData(key));
   maSeries[key] = series;
 }
 
